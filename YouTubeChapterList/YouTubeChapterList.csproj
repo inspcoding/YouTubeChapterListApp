@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="wwwroot\.nojekyll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="wwwroot\css\app.css">
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="publish\" />
+    <Folder Include="wwwroot\images\" />
+    <Folder Include="wwwroot\scripts\" />
+  </ItemGroup>
+	
+	<Target Name="PostPublish" AfterTargets="AfterPublish">
+		<Exec Command="gh-pages.bat" />
+	</Target>
+</Project>
