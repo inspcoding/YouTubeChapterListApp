@@ -1,5 +1,10 @@
 ﻿@page "/"
 @page "/index.html"
+@using System.Diagnostics
+@using System.Text
+@using Microsoft.VisualBasic
+@using Microsoft.VisualBasic.FileIO
+@inject IJSRuntime JSRuntime
 
 <PageTitle>The YouTube Chapter List Creator</PageTitle>
 <HeadContent>
@@ -8,6 +13,123 @@
     <meta name="robots" content="index, follow" />
 </HeadContent>
 
-<h1>Hello, world!</h1>
+<FluentHeader Style="background-color:#FF0000">
+    The YouTube Chapter List Creator
+</FluentHeader>
 
-Welcome to your new app.
+<div style="width:400px;margin-left:auto;margin-right:auto;margin-top:15px;">
+    <h1>Drop your Davinci Resolve CSV Edit Index File Here:</h1>
+    <FluentInputFile Id="my-file-uploader"
+    Mode="InputFileMode.Buffer"
+    Multiple="true"
+    MaximumFileCount="1"
+    MaximumFileSize="@(10*1024*1024)"
+    Accept="text/csv"
+    @bind-ProgressPercent="@ProgressPercent"
+    OnCompleted="@OnCompletedAsync"
+    Style="height: 300px;">
+        <ChildContent>
+            <label for="my-file-uploader">
+                <FluentIcon Value="@(new @Icons.Regular.Size24.ArrowUpload())" />
+            </label>
+
+            <div>
+                Drag the file here you wish to process,
+                or <label for="my-file-uploader">browse</label>
+                for them<span style="color: red;">*</span>.
+                <br />
+                <em>Currently only supports Davinci Resolve Edit Index CSVs</em>
+            </div>
+        </ChildContent>
+    </FluentInputFile>
+
+    @if (Files.Any())
+    {
+        <h4>File(s) uploaded:</h4>
+        <ul>
+            @foreach (var file in Files)
+            {
+                <li>
+                    <b>@file.Name</b> 🔹
+                    @($"{Decimal.Divide(file.Size, 1024):N} KB") 🔹
+                    @file.ContentType 🔹
+                    @file.LocalFile?.FullName
+                    @file.ErrorMessage
+                </li>
+            }
+        </ul>
+    }
+
+    <h1>Paste text text into your YouTube Video Description:</h1>
+    <FluentButton IconStart="@(new Icons.Regular.Size16.Copy())" Style="float:right;" OnClick="CopyTextToClipboard">Copy</FluentButton>
+    <FluentTextArea @bind-Value=@CSVText Rows="20" Resize="TextAreaResize.Vertical" Style="width:100%;" />
+
+</div>
+@code
+{
+    private async Task CopyTextToClipboard()
+    {
+        await JSRuntime.InvokeVoidAsync("clipboardCopy.copyText", CSVText);
+    }
+
+    private string CSVText = string.Empty;
+    int ProgressPercent = 0;
+    FluentInputFileEventArgs[] Files = Array.Empty<FluentInputFileEventArgs>();
+
+    private async Task OnCompletedAsync(IEnumerable<FluentInputFileEventArgs> files)
+    {
+        Files = files.ToArray();
+
+        if(Files.Length > 0){
+            var file = Files[0];
+            // CSVText = Encoding.Default.GetString(file.Buffer.Data);
+
+            using var csvStream = new MemoryStream(file.Buffer.Data);
+            using var reader = new TextFieldParser(csvStream)
+            {
+                TextFieldType = FieldType.Delimited,
+                HasFieldsEnclosedInQuotes = true
+            };
+            reader.SetDelimiters(",");
+
+            var dataRow = new string[0];
+            var timeIndex = 0;
+            var nameIndex = 0;
+
+            dataRow = reader.ReadFields();
+            if (dataRow is not null)
+            {
+                timeIndex = dataRow.Index().FirstOrDefault(x => x.Item == "Source In").Index;
+                nameIndex = dataRow.Index().FirstOrDefault(x => x.Item == "Notes").Index;
+            }
+
+            var timecodes = new StringBuilder();
+            timecodes.AppendLine("-- TIMESTAMPS --");
+            while(!reader.EndOfData){
+                dataRow = reader.ReadFields();
+                if((dataRow is not null) && dataRow.Length > 1)
+                {
+                    timecodes.AppendLine($"{GetFormattedTimeCode(dataRow[timeIndex])} {dataRow[nameIndex]}");
+                }
+            }
+
+            CSVText = timecodes.ToString();
+        }
+
+        // Wait 3 seconds before to reset the progress bar.
+        await Task.Delay(3000);
+        ProgressPercent = 0;
+    }
+
+    private string GetFormattedTimeCode(string timecode){
+        var data = timecode.Split(':');
+        var timeData = data.Skip(1).Take(2).ToArray();
+        if(timeData[0].StartsWith("0")){
+            timeData[0] = timeData[0].Substring(1);
+        }
+        return string.Join(":", timeData);
+    }
+
+
+}
+
